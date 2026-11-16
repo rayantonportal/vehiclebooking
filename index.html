@@ -150,13 +150,20 @@ body{background:radial-gradient(900px 420px at 8% -8%,color-mix(in srgb,var(--go
 .sf{position:absolute;top:0;border-radius:50%;background:radial-gradient(circle,#fff 30%,rgba(255,255,255,.0) 72%);will-change:transform;animation:sfall var(--t,12s) linear infinite;animation-delay:var(--l,0s)}
 @keyframes sfall{from{transform:translate3d(0,-12vh,0)}to{transform:translate3d(var(--dx,20px),112vh,0)}}
 @media(prefers-reduced-motion:reduce){.dc{animation:none}#snow{display:none}}
-/* admin panel on the side (wide screens) */
+/* admin: side tab menu on the left, one view at a time on the right */
 .lside .card{margin-bottom:0}
-@media(min-width:1180px){
-body.isadm .w{max-width:1600px}
-body.isadm .lay{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:16px;align-items:start}
-body.isadm .lside{position:sticky;top:calc(env(safe-area-inset-top,0px) + 84px);max-height:calc(100vh - 100px);overflow:auto;border-radius:16px;scrollbar-width:thin}
+@media(min-width:1180px){body.isadm .w{max-width:1600px}}
+body.isadm .lay{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start}
+body.isadm .lside{order:-1;position:sticky;top:calc(env(safe-area-inset-top,0px) + 84px)}
+body.isadm .lmain{min-width:0}
+body.isadm #lc .anav{display:flex;flex-direction:column;gap:6px}
+body.isadm #lc .tabb{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;border-radius:12px!important;padding:11px 14px}
 body.isadm #cal{min-width:760px!important}
+@media(max-width:899px){
+body.isadm .lay{grid-template-columns:minmax(0,1fr)}
+body.isadm .lside{position:static}
+body.isadm #lc .anav{flex-direction:row;flex-wrap:wrap}
+body.isadm #lc .tabb{width:auto}
 }
 .tgb{border-radius:99px!important;padding:6px 12px!important;font-size:13px}
 .tgl{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);right:14px;z-index:2;background:rgba(255,255,255,.12)!important;color:#fff!important;border-color:rgba(255,255,255,.35)!important}
@@ -187,41 +194,8 @@ if(t!=='default')d.setAttribute('data-m',m);
   <p class="sm" id="sync">Connecting…</p>
 
   <div class="lay" id="lay"><div class="lmain">
-  <div class="card">
-    <div class="top">
-      <div class="nav"><button id="prev">◀</button> <b id="mt" style="margin:0 8px"></b> <button id="next">▶</button></div>
-      <div class="leg"><span><i class="dot" style="background:var(--a)"></i>NCQ 6924</span><span><i class="dot" style="background:var(--b)"></i>PIU 807</span><span><i class="dot" style="background:var(--no)"></i>Under repair</span><span>Striped = Pending</span><span>Gray = Cancelled</span><span style="color:var(--ok)">Green = Available</span></div>
-    </div>
-    <div class="note" id="rpn" style="display:none"></div>
-    <div class="note"><span class="nt">Note: Coding Day</span><span class="chip"><i style="background:var(--a)"></i><b>NCQ 6924</b> – Tuesday</span><span class="chip"><i style="background:var(--b)"></i><b>PIU 807</b> – Thursday</span></div>
-    <div id="hint" class="sm" style="display:none;margin-bottom:8px">Admin: click a schedule on the calendar to edit it.</div>
-    <div class="scroll"><div class="cal" id="cal" style="min-width:900px"></div></div>
-  </div>
-
-  <div class="card">
-    <h2 style="margin:0 0 12px">Request Form</h2>
-    <form id="fm">
-      <label>Vehicle<select id="veh"><option>NCQ 6924</option><option>PIU 807</option></select></label>
-      <label>Requested by (full name)<input id="by" required placeholder="First name and last name"></label>
-      <label>Email (we’ll notify you when it’s approved or cancelled)<input id="em" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com"></label>
-      <label>Date from<input id="d1" type="date" required></label>
-      <label>Date to<input id="d2" type="date" required></label>
-      <label class="f">Vehicle schedule<select id="sch"><option value="day">Whole day</option><option value="time">With time (estimate)</option></select></label>
-      <label id="lt1" style="display:none">Departure time (estimate)<input id="t1" type="time"></label>
-      <label id="lt2" style="display:none">Return time (estimate)<input id="t2" type="time"></label>
-      <div class="f cn" id="cn"></div>
-      <label>Destination<input id="dest" required></label>
-      <label>Driver<input id="drv" required></label>
-      <label class="f">Purpose<textarea id="pur" rows="2" required></textarea></label>
-      <div class="err" id="err"></div>
-      <div class="f"><button class="btn p" id="sub" type="submit">Submit Request</button></div>
-    </form>
-  </div>
-
-  </div><aside class="lside">
-  <div class="card" id="lc" style="display:none">
-    <h2 style="margin:0 0 12px">Admin <span class="sm" id="role" style="font-family:DM Sans,system-ui,sans-serif;font-weight:400"></span></h2>
-    <div><button class="btn tabb on" data-tab="req" type="button">Requests <span id="pc"></span></button> <button class="btn tabb" data-tab="his" type="button">History</button> <button class="btn tabb" data-tab="rp" type="button">Under Repair <span id="rpc"></span></button> <button class="btn tabb" data-tab="bk" type="button">Export / Backup</button></div>
+  <div class="card" id="ac" style="display:none">
+    <h2 id="act" style="margin:0 0 12px"></h2>
     <div class="ctl" id="hc" style="display:none">
       <input id="hq" type="search" placeholder="Search name, destination, driver, vehicle…">
       <select id="hs"><option value="all">All status</option><option value="approved">Approved</option><option value="rejected">Cancelled</option></select>
@@ -257,6 +231,43 @@ if(t!=='default')d.setAttribute('data-m',m);
       <div id="rlist" style="margin-top:14px"></div>
     </div>
     <div id="list" class="sm" style="margin-top:8px">Loading…</div>
+  </div>
+
+  <div class="card" id="calcard">
+    <div class="top">
+      <div class="nav"><button id="prev">◀</button> <b id="mt" style="margin:0 8px"></b> <button id="next">▶</button></div>
+      <div class="leg"><span><i class="dot" style="background:var(--a)"></i>NCQ 6924</span><span><i class="dot" style="background:var(--b)"></i>PIU 807</span><span><i class="dot" style="background:var(--no)"></i>Under repair</span><span>Striped = Pending</span><span>Gray = Cancelled</span><span style="color:var(--ok)">Green = Available</span></div>
+    </div>
+    <div class="note" id="rpn" style="display:none"></div>
+    <div class="note"><span class="nt">Note: Coding Day</span><span class="chip"><i style="background:var(--a)"></i><b>NCQ 6924</b> – Tuesday</span><span class="chip"><i style="background:var(--b)"></i><b>PIU 807</b> – Thursday</span></div>
+    <div id="hint" class="sm" style="display:none;margin-bottom:8px">Admin: click a schedule on the calendar to edit it.</div>
+    <div class="scroll"><div class="cal" id="cal" style="min-width:900px"></div></div>
+  </div>
+
+  <div class="card" id="formcard">
+    <h2 style="margin:0 0 12px">Request Form</h2>
+    <form id="fm">
+      <label>Vehicle<select id="veh"><option>NCQ 6924</option><option>PIU 807</option></select></label>
+      <label>Requested by (full name)<input id="by" required placeholder="First name and last name"></label>
+      <label>Email (we’ll notify you when it’s approved or cancelled)<input id="em" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com"></label>
+      <label>Date from<input id="d1" type="date" required></label>
+      <label>Date to<input id="d2" type="date" required></label>
+      <label class="f">Vehicle schedule<select id="sch"><option value="day">Whole day</option><option value="time">With time (estimate)</option></select></label>
+      <label id="lt1" style="display:none">Departure time (estimate)<input id="t1" type="time"></label>
+      <label id="lt2" style="display:none">Return time (estimate)<input id="t2" type="time"></label>
+      <div class="f cn" id="cn"></div>
+      <label>Destination<input id="dest" required></label>
+      <label>Driver<input id="drv" required></label>
+      <label class="f">Purpose<textarea id="pur" rows="2" required></textarea></label>
+      <div class="err" id="err"></div>
+      <div class="f"><button class="btn p" id="sub" type="submit">Submit Request</button></div>
+    </form>
+  </div>
+
+  </div><aside class="lside">
+  <div class="card" id="lc" style="display:none">
+    <h2 style="margin:0 0 12px">Admin <span class="sm" id="role" style="font-family:DM Sans,system-ui,sans-serif;font-weight:400"></span></h2>
+    <div class="anav"><button class="btn tabb" data-tab="cal" type="button"><span>📅 Calendar</span></button><button class="btn tabb on" data-tab="req" type="button"><span>📥 Requests</span> <span id="pc"></span></button><button class="btn tabb" data-tab="his" type="button"><span>🕘 History</span></button><button class="btn tabb" data-tab="rp" type="button"><span>🔧 Under Repair</span> <span id="rpc"></span></button><button class="btn tabb" data-tab="bk" type="button"><span>💾 Export / Backup</span></button></div>
   </div>
   </aside></div>
 </div>
@@ -359,13 +370,15 @@ function drawCal(){
 var tab='req';
 function cmp(f,dir){return function(a,b){var x=String(f(a)||'').toLowerCase(),y=String(f(b)||'').toLowerCase();return dir*x.localeCompare(y)}}
 function drawList(){
-  $('role').textContent=isAdmin?'(Admin view)':'';$('lc').style.display=isAdmin?'':'none';document.body.classList.toggle('isadm',!!isAdmin);$('hint').style.display=isAdmin?'':'none';
+  $('role').textContent=isAdmin?'(Admin view)':'';$('lc').style.display=isAdmin?'':'none';document.body.classList.toggle('isadm',!!isAdmin);$('ac').style.display=(isAdmin&&tab!=='cal')?'':'none';$('calcard').style.display=$('formcard').style.display=(!isAdmin||tab==='cal')?'':'none';$('hint').style.display=isAdmin?'':'none';
   if(!isAdmin)return;
   var pend=reqs.filter(function(r){return r.status==='pending'});
   $('pc').textContent=pend.length?'('+pend.length+')':'';
   Array.prototype.forEach.call(document.querySelectorAll('.tabb'),function(b){b.classList.toggle('on',b.dataset.tab===tab)});
   $('hc').style.display=tab==='his'?'':'none';$('bk').style.display=tab==='bk'?'':'none';$('list').style.display=(tab==='bk'||tab==='rp')?'none':'';$('rp').style.display=tab==='rp'?'':'none';
   var tdy=iso(new Date()),ar=reps.filter(function(x){return x.d1<=tdy&&tdy<=x.d2}).length;$('rpc').textContent=ar?'('+ar+')':'';
+  $('act').textContent={req:'Pending Requests',his:'History',rp:'Under Repair',bk:'Export / Backup'}[tab]||'';
+  if(tab==='cal')return;
   if(tab==='bk'){if(!$('xm').value)$('xm').value=cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0');return}
   if(tab==='rp'){drawRep();return}
   var s;
@@ -587,7 +600,9 @@ function applySch(sel,l1,l2,i1,i2){
   if(!t){$(i1).value='';$(i2).value=''}
 }
 function updateNotice(){updateNotice0();var a=$('d1').value,b=$('d2').value,v=$('veh').value,rp=(a&&b&&b>=a)?repHit(v,a,b):[];
-  if(rp.length)$('cn').textContent=v+' is under repair on these dates:\n'+rp.map(fmtR).join('\n')+'\n\nIt cannot be booked on these dates. Please choose another date or vehicle.'}
+  var cn=$('cn');
+  if(rp.length){cn.textContent='🔧 '+v+' is UNDER REPAIR on these dates:\n'+rp.map(fmtR).join('\n')+'\n\nIt cannot be booked on these dates, so the request cannot be submitted. Please choose another date or vehicle.';cn.style.color='var(--no)';cn.style.borderLeftColor='var(--no)';cn.style.fontWeight='600'}
+  else{cn.style.color='';cn.style.borderLeftColor='';cn.style.fontWeight=''}}
 function updateNotice0(){
   var v=$('veh').value,a=$('d1').value,b=$('d2').value,box=$('cn');
   var c=(a&&b&&b>=a)?reqs.filter(function(x){return x.veh===v&&x.status!=='rejected'&&x.d1<=b&&a<=x.d2}):[];
@@ -608,7 +623,7 @@ $('next').onclick=function(){cur.setMonth(cur.getMonth()+1);drawCal()};
 
 function fmtB(x){return '• '+x.d1+(x.d2!==x.d1?' → '+x.d2:'')+(x.t1?' · '+x.t1+(x.t2?'–'+x.t2:''):' · whole day')+' ('+(x.status==='pending'?'Pending':'Approved')+')'}
 function checkClash(r,selfId){
-  var rh=repHit(r.veh,r.d1,r.d2);if(rh.length&&selfId==null)return {block:r.veh+' is under repair on these dates:\n'+rh.map(fmtR).join('\n')+'\n\nIt cannot be booked on these dates. Please choose another date or vehicle.'};
+  var rh=repHit(r.veh,r.d1,r.d2);if(rh.length&&selfId==null)return {block:r.veh+' is under repair on these dates:\n'+rh.map(fmtR).join('\n')+'\n\nIt cannot be booked on these dates, so the request cannot be submitted. Please choose another date or vehicle.',repair:true};
   var c=reqs.filter(function(x){return x.id!==selfId&&x.veh===r.veh&&x.status!=='rejected'&&x.d1<=r.d2&&r.d1<=x.d2});
   if(!c.length)return null;
   var head=r.veh+' is already booked on these dates:\n'+c.map(fmtB).join('\n')+'\n\n';
@@ -630,7 +645,7 @@ function openEdit(id){
 $('ecancel').onclick=function(){$('ed').close()};
 $('cal').onclick=function(e){
   var t=e.target.closest('.ev');if(!t||!isAdmin)return;
-  if(t.dataset.rid){tab='rp';drawList();editRep(t.dataset.rid);$('lc').scrollIntoView({behavior:'smooth'});return}
+  if(t.dataset.rid){tab='rp';drawList();editRep(t.dataset.rid);window.scrollTo({top:0,behavior:'smooth'});return}
   if(t.dataset.id)openEdit(t.dataset.id);
 };
 $('eform').onsubmit=function(e){
@@ -722,12 +737,12 @@ $('fm').onsubmit=function(e){
   if(r.d1<todayStr()||r.d2<todayStr()){$('err').textContent='Past dates cannot be booked. Please choose today or a later date.';return}
   if(r.d2<r.d1){$('err').textContent='"Date to" cannot be earlier than "Date from".';return}
   var ck=checkClash(r,null);
-  if(ck&&ck.block){$('err').textContent=ck.block;return}
+  if(ck&&ck.block){$('err').textContent=ck.block;if(ck.repair)alert('🔧 '+ck.block);return}
   if(ck&&ck.warn&&!confirm(ck.warn))return;
   $('sub').disabled=true;
   db.collection('requests').add(r).then(function(){$('fm').reset();applySch('sch','lt1','lt2','t1','t2');updateNotice();showToast('Submitted! Please wait for the admin’s approval.');$('err').style.color='var(--ok)';$('err').textContent='Submitted! Please wait for the admin’s approval.';
     setTimeout(function(){$('err').textContent='';$('err').style.color=''},4000)})
-  .catch(function(e){$('err').textContent=(e&&e.code==='23P01')?r.veh+' cannot be booked for those times/dates: it is already booked, or the database does not allow overlapping bookings on the same day. Please choose another time or date, or tell the admin.':'Could not submit ('+((e&&e.message)||'unknown error')+'). Please try again.'})
+  .catch(function(e){$('err').textContent=(e&&/under repair/i.test(e.message||''))?'🔧 '+e.message:(e&&e.code==='23P01')?r.veh+' cannot be booked for those times/dates: it is already booked, or the database does not allow overlapping bookings on the same day. Please choose another time or date, or tell the admin.':'Could not submit ('+((e&&e.message)||'unknown error')+'). Please try again.'})
   .then(function(){$('sub').disabled=false});
 };
 
