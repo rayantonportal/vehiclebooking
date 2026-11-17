@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#16306b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vehicle Booking">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Vehicle Booking – NCQ 6924 & PIU 807</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -901,6 +909,31 @@ db=remoteDb();
     lab()}
   Array.prototype.forEach.call(gs,function(b){b.onclick=function(){apply(b.getAttribute('data-th'))}});
   lab();
+})();
+</script>
+<style>
+#ib{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:50;display:none;align-items:center;gap:8px;max-width:calc(100vw - 28px);background:var(--br);color:var(--brt);border:0;border-radius:99px;padding:11px 16px;font:500 14px "DM Sans",system-ui,sans-serif;box-shadow:var(--sh);cursor:pointer}
+#ib.on{display:flex}#ib button{all:unset;cursor:pointer;opacity:.75;padding:0 2px}
+</style>
+<div id="ib" role="button" tabindex="0"><span id="ibt">Install app</span><button id="ibx" aria-label="Dismiss">✕</button></div>
+<script>
+(function(){
+  if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+    window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});
+  }
+  var ib=document.getElementById('ib'),tx=document.getElementById('ibt'),dp=null;
+  var standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  var ios=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream;
+  var dismissed=false;try{dismissed=sessionStorage.getItem('vb_ib')==='1'}catch(e){}
+  if(standalone||dismissed)return;
+  function show(){ib.classList.add('on')}
+  window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();dp=e;tx.textContent='Install app';show()});
+  window.addEventListener('appinstalled',function(){ib.classList.remove('on');dp=null});
+  if(ios){tx.textContent='To install: tap Share, then Add to Home Screen';show()}
+  ib.onclick=function(e){
+    if(e.target.id==='ibx'){ib.classList.remove('on');try{sessionStorage.setItem('vb_ib','1')}catch(x){}return}
+    if(dp){dp.prompt();dp.userChoice.then(function(){dp=null;ib.classList.remove('on')})}
+  };
 })();
 </script>
 </body>
