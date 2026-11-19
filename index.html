@@ -770,16 +770,34 @@ function remoteDb(){
     subs.forEach(function(f){f({docs:docs})});sync(true)}).catch(function(){sync(false)})})}
   function sync(ok){var e=$('sync');if(!e)return;if(ok){e.style.color='var(--ok)';e.textContent='● Online · Last sync: '+new Date().toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'Asia/Manila'})}else{e.style.color='var(--no)';e.textContent='● Offline — cannot reach the server. Retrying.'}}
   function done(){pull()}
-  setInterval(function(){if(!document.hidden)pull()},5000);
+  var tk=0;
+  setInterval(function(){tk++;if(!document.hidden||tk%5===0)pull()},3000);
   document.addEventListener('visibilitychange',function(){if(!document.hidden)pull()});
-  window.addEventListener('online',pull);window.addEventListener('focus',pull);
+  window.addEventListener('online',function(){pull();rtConnect()});window.addEventListener('focus',pull);
+  /* ---- Supabase Realtime (WebSocket): instant push when a request is added/changed ---- */
+  var ws=null,wsHb=null,wsRt=null,wsTok=null,wsOn=false;
+  function rtSend(o){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))}catch(e){}}
+  function rtConnect(){
+    if(ws&&(ws.readyState===0||ws.readyState===1)){
+      if(ws.readyState===1&&TOKEN&&TOKEN!==wsTok){wsTok=TOKEN;rtSend({topic:'realtime:vb-req',event:'access_token',payload:{access_token:TOKEN},ref:'tk'})}
+      return}
+    try{ws=new WebSocket(SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+encodeURIComponent(SB_KEY)+'&vsn=1.0.0')}catch(e){return}
+    ws.onopen=function(){
+      wsTok=TOKEN;wsOn=true;
+      rtSend({topic:'realtime:vb-req',event:'phx_join',ref:'1',join_ref:'1',payload:{config:{broadcast:{ack:false,self:false},presence:{key:''},postgres_changes:[{event:'*',schema:'public',table:'vehicle_requests'},{event:'*',schema:'public',table:'vehicle_repairs'}]},access_token:TOKEN||SB_KEY}});
+      clearInterval(wsHb);wsHb=setInterval(function(){rtSend({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'})},25000)};
+    ws.onmessage=function(m){var j;try{j=JSON.parse(m.data)}catch(e){return}
+      if(j&&j.event==='postgres_changes')pull()};
+    ws.onclose=function(){wsOn=false;clearInterval(wsHb);ws=null;clearTimeout(wsRt);wsRt=setTimeout(rtConnect,3000)};
+    ws.onerror=function(){try{ws.close()}catch(e){}}}
+  rtConnect();
   function restore(rows,onp){var ok=0,bad=0,first='',i=0;
     function next(){if(i>=rows.length)return Promise.resolve({ok:ok,bad:bad,err:first});
       var r=rows[i++];onp&&onp(i,rows.length);
       return fetch(TBL+'?on_conflict=id',{method:'POST',headers:hd({Prefer:'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(r)})
         .then(function(x){return x.ok?(ok++):fail(x)}).catch(function(e){bad++;if(!first)first=(e&&e.message)||'error'}).then(next)}
     return next().then(function(res){pull();return res})}
-  return {refresh:pull,restore:restore,
+  return {refresh:function(){pull();rtConnect()},restore:restore,
     saveRepair:function(r,id){var b={veh:r.veh,d1:r.d1,d2:r.d2,reason:r.reason||null};return fetch(RTBL+(id?'?id=eq.'+encodeURIComponent(id):''),{method:id?'PATCH':'POST',headers:hd({Prefer:'return=representation'}),body:JSON.stringify(b)}).then(function(x){return x.ok?x.json():fail(x)}).then(function(a){if(!a.length)throw new Error('denied');done()})},
     delRepair:function(id){return fetch(RTBL+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:hd({Prefer:'return=representation'})}).then(function(x){return x.ok?x.json():fail(x)}).then(function(a){if(!a.length)throw new Error('denied');done()})},collection:function(){return {
     add:function(r){
@@ -879,6 +897,7 @@ db=remoteDb();
   function sndBtn(){var b=$('snd');if(!b)return;b.style.display=(mode==='admin')?'':'none';b.textContent=sndOn?'🔔':'🔕';b.title=sndOn?'Notification sound: ON (click to choose sound)':'Notification sound: OFF (click to choose sound)'}
   $('snd').onclick=function(){if(pop)closePop();else openPop()};
   var _show=show;show=function(){_show();sndBtn()};sndBtn();
+  document.addEventListener('click',function(){try{if(mode==='admin'&&window.Notification&&Notification.permission==='default')Notification.requestPermission()}catch(e){}});
   /* ===== Guest <-> Admin chat ===== */
   var CT=SB_URL+'/rest/v1/vehicle_chat',CK={name:'',open:false,msgs:[],thr:null,ok:true,max:null,busy:false,mode:null,sig:'',tick:0};
   try{CK.name=localStorage.getItem('vb_chat_name')||''}catch(e){}
@@ -979,7 +998,11 @@ db=remoteDb();
       if(seen){
         var fresh=pend.filter(function(id){return seen.indexOf(id)<0});
         if(fresh.length){if(sndOn)chime();showToast(fresh.length===1?'New vehicle request received!':fresh.length+' new vehicle requests received!');
-          try{if(document.hidden)document.title='🔔 New request · '+document.title.replace(/^🔔 New request · /,'')}catch(e){}}
+          try{if(document.hidden)document.title='🔔 New request · '+document.title.replace(/^🔔 New request · /,'')}catch(e){}
+          try{if(window.Notification&&Notification.permission==='granted'&&document.hidden){
+            var nr=reqs.filter(function(r){return r.id===fresh[fresh.length-1]})[0]||{};
+            var nt=new Notification('New vehicle request',{body:fresh.length>1?fresh.length+' new requests are waiting for approval.':(nr.by||'Someone')+' · '+(nr.veh||'')+' · '+(nr.d1||'')+(nr.dest?' → '+nr.dest:''),tag:'vb-new-request'});
+            nt.onclick=function(){window.focus();nt.close()}}}catch(e){}}
       }
       seen=pend;
     }else seen=null;
