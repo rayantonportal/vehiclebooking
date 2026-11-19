@@ -196,7 +196,7 @@ if(t!=='default')d.setAttribute('data-m',m);
 </head>
 <body>
 <div class="w" id="main" style="display:none">
-  <header class="hd" id="bar"><div class="brand"><span class="logo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14.5l1.4-4.3A2 2 0 0 1 7.3 8.8h9.4a2 2 0 0 1 1.9 1.4L20 14.5"/><path d="M3.5 14.5h17V18a1 1 0 0 1-1 1H19a1 1 0 0 1-1-1v-.5H6V18a1 1 0 0 1-1 1h-.5a1 1 0 0 1-1-1z"/><circle cx="7.6" cy="16.2" r=".6" fill="currentColor"/><circle cx="16.4" cy="16.2" r=".6" fill="currentColor"/></svg></span><div><div class="bt">Vehicle Booking</div><div class="bs">NCQ 6924 · PIU 807</div></div></div><div class="hr"><div class="tgg" role="group" aria-label="Theme"><button type="button" data-th="default" title="Default (blue)">🔵 <span class="tl">Default</span></button><button type="button" data-th="light" title="Light">☀️ <span class="tl">Light</span></button><button type="button" data-th="dark" title="Dark">🌙 <span class="tl">Dark</span></button></div><span class="pill" id="who"></span><button class="btn" id="exit" type="button"></button></div></header>
+  <header class="hd" id="bar"><div class="brand"><span class="logo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14.5l1.4-4.3A2 2 0 0 1 7.3 8.8h9.4a2 2 0 0 1 1.9 1.4L20 14.5"/><path d="M3.5 14.5h17V18a1 1 0 0 1-1 1H19a1 1 0 0 1-1-1v-.5H6V18a1 1 0 0 1-1 1h-.5a1 1 0 0 1-1-1z"/><circle cx="7.6" cy="16.2" r=".6" fill="currentColor"/><circle cx="16.4" cy="16.2" r=".6" fill="currentColor"/></svg></span><div><div class="bt">Vehicle Booking</div><div class="bs">NCQ 6924 · PIU 807</div></div></div><div class="hr"><div class="tgg" role="group" aria-label="Theme"><button type="button" data-th="default" title="Default (blue)">🔵 <span class="tl">Default</span></button><button type="button" data-th="light" title="Light">☀️ <span class="tl">Light</span></button><button type="button" data-th="dark" title="Dark">🌙 <span class="tl">Dark</span></button></div><span class="pill" id="who"></span><button class="btn" id="snd" type="button" title="Notification sound" style="display:none">🔔</button><button class="btn" id="exit" type="button"></button></div></header>
   <p class="sub">Request a vehicle, check the calendar, and wait for the admin’s approval.</p>
   <div class="ribbon" id="rib"></div>
   <p class="sm" id="sync">Connecting…</p>
@@ -842,9 +842,57 @@ db=remoteDb();
   if(rm&&rm.email){$('lem').value=rm.email;$('lrem').checked=!!rm.rt}
   if(!mode&&rm&&rm.rt){$('lp').style.visibility='hidden';
     refreshSession().then(function(ok){$('lp').style.visibility='';if(ok){var ad=document.querySelector('.seg .btn[data-lt="admin"]');if(ad)ad.click()}})}
+  var AC=null,sndOn=true,seen=null;
+  try{if(localStorage.getItem('vb_snd')==='off')sndOn=false}catch(e){}
+  function ac(){try{if(!AC){var C=window.AudioContext||window.webkitAudioContext;if(C)AC=new C()}if(AC&&AC.state==='suspended')AC.resume()}catch(e){}return AC}
+  ['click','touchstart','keydown'].forEach(function(ev){document.addEventListener(ev,function(){ac()},{once:true,passive:true})});
+  var SND={
+    chime:{n:'Chime',s:[[880,0,.35],[1320,.18,.35],[880,.42,.35],[1320,.6,.35]]},
+    ding:{n:'Ding',s:[[1319,0,1,'sine',.4],[2638,0,.5,'sine',.08]]},
+    dingdong:{n:'Ding-dong',s:[[659,0,.7,'sine',.4],[523,.5,1,'sine',.4]]},
+    bell:{n:'Bell',s:[[1047,0,1.3,'sine',.3],[1568,0,1,'sine',.14],[2093,0,.7,'sine',.1]]},
+    marimba:{n:'Marimba',s:[[523,0,.3,'triangle',.45],[659,.15,.3,'triangle',.45],[784,.3,.55,'triangle',.45]]},
+    pop:{n:'Soft pop',s:[[600,0,.14,'sine',.45],[900,.1,.2,'sine',.4]]},
+    beep:{n:'Beep-beep-beep',s:[[1000,0,.15,'square',.12],[1000,.25,.15,'square',.12],[1000,.5,.15,'square',.12]]},
+    alert:{n:'Alert (malakas)',s:[[880,0,.25,'sawtooth',.16],[660,.25,.25,'sawtooth',.16],[880,.5,.25,'sawtooth',.16],[660,.75,.3,'sawtooth',.16]]}
+  };
+  var SEL='chime';try{var sv0=localStorage.getItem('vb_snd_sel');if(sv0&&SND[sv0])SEL=sv0}catch(e){}
+  function play(k){var c=ac();if(!c)return;var t=c.currentTime;
+    (SND[k]||SND.chime).s.forEach(function(n){
+      var o=c.createOscillator(),g=c.createGain(),v=n[4]||.35,s=t+n[1];o.type=n[3]||'sine';o.frequency.value=n[0];
+      g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+.02);g.gain.exponentialRampToValueAtTime(.001,s+n[2]);
+      o.connect(g);g.connect(c.destination);o.start(s);o.stop(s+n[2]+.05)})}
+  function chime(){play(SEL)}
+  var pop=null;
+  function closePop(){if(pop){pop.remove();pop=null}}
+  function openPop(){closePop();var r=$('snd').getBoundingClientRect();
+    pop=document.createElement('div');pop.id='sp';pop.style.top=(r.bottom+8)+'px';
+    var h='<div class="sph"><b>Notification sound</b><label class="spt"><input type="checkbox" id="spon"'+(sndOn?' checked':'')+'> On</label></div>';
+    Object.keys(SND).forEach(function(k){h+='<button type="button" class="spi'+(k===SEL?' on':'')+'" data-k="'+k+'"><span class="spr"></span><span>'+SND[k].n+'</span><span class="spp">▶</span></button>'});
+    pop.innerHTML=h;document.body.appendChild(pop);
+    pop.querySelector('#spon').onchange=function(){sndOn=this.checked;try{localStorage.setItem('vb_snd',sndOn?'on':'off')}catch(e){}sndBtn()};
+    Array.prototype.forEach.call(pop.querySelectorAll('.spi'),function(b){b.onclick=function(){
+      SEL=b.getAttribute('data-k');try{localStorage.setItem('vb_snd_sel',SEL)}catch(e){}
+      Array.prototype.forEach.call(pop.querySelectorAll('.spi'),function(x){x.classList.toggle('on',x===b)});play(SEL)}})}
+  document.addEventListener('click',function(e){if(pop&&!pop.contains(e.target)&&!$('snd').contains(e.target))closePop()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closePop()});
+  function sndBtn(){var b=$('snd');if(!b)return;b.style.display=(mode==='admin')?'':'none';b.textContent=sndOn?'🔔':'🔕';b.title=sndOn?'Notification sound: ON (click to choose sound)':'Notification sound: OFF (click to choose sound)'}
+  $('snd').onclick=function(){if(pop)closePop();else openPop()};
+  var _show=show;show=function(){_show();sndBtn()};sndBtn();
   db.collection('requests').onSnapshot(function(s){
-    reqs=s.docs.map(function(d){var x=Object.assign({},d.data());x.id=d.id;return x});draw();
+    reqs=s.docs.map(function(d){var x=Object.assign({},d.data());x.id=d.id;return x});
+    if(mode==='admin'){
+      var pend=reqs.filter(function(r){return r.status==='pending'}).map(function(r){return r.id});
+      if(seen){
+        var fresh=pend.filter(function(id){return seen.indexOf(id)<0});
+        if(fresh.length){if(sndOn)chime();showToast(fresh.length===1?'New vehicle request received!':fresh.length+' new vehicle requests received!');
+          try{if(document.hidden)document.title='🔔 New request · '+document.title.replace(/^🔔 New request · /,'')}catch(e){}}
+      }
+      seen=pend;
+    }else seen=null;
+    draw();
   });
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)document.title=document.title.replace(/^🔔 New request · /,'')});
 })();
 </script>
 <script>
@@ -912,6 +960,15 @@ db=remoteDb();
 })();
 </script>
 <style>
+#sp{position:fixed;right:14px;z-index:10001;width:min(280px,calc(100vw - 28px));background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--sh);padding:8px;font:500 14px "DM Sans",system-ui,sans-serif}
+.sph{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 8px;border-bottom:1px solid var(--bd);margin-bottom:4px}
+.spt{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);cursor:pointer}
+#sp input{width:auto;padding:0;accent-color:var(--gold)}
+.spi{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;color:inherit;font:inherit;text-align:left;padding:9px 8px;border-radius:9px;cursor:pointer}
+.spi:hover{background:color-mix(in srgb,var(--gold) 12%,transparent)}
+.spr{width:14px;height:14px;border-radius:50%;border:2px solid var(--mut);flex:none}
+.spi.on .spr{border-color:var(--gold);background:radial-gradient(var(--gold) 45%,transparent 50%)}
+.spp{margin-left:auto;color:var(--mut);font-size:12px}
 #ib{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:10000;display:none;flex-direction:column;align-items:flex-end;gap:8px;max-width:calc(100vw - 28px);font:500 14px "DM Sans",system-ui,sans-serif}
 #ib.on{display:flex}
 #ibb{display:flex;align-items:center;gap:10px;background:var(--br);color:var(--brt);border:0;border-radius:99px;padding:11px 16px;font:inherit;box-shadow:var(--sh);cursor:pointer}
