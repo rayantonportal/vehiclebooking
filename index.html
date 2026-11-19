@@ -879,6 +879,99 @@ db=remoteDb();
   function sndBtn(){var b=$('snd');if(!b)return;b.style.display=(mode==='admin')?'':'none';b.textContent=sndOn?'🔔':'🔕';b.title=sndOn?'Notification sound: ON (click to choose sound)':'Notification sound: OFF (click to choose sound)'}
   $('snd').onclick=function(){if(pop)closePop();else openPop()};
   var _show=show;show=function(){_show();sndBtn()};sndBtn();
+  /* ===== Guest <-> Admin chat ===== */
+  var CT=SB_URL+'/rest/v1/vehicle_chat',CK={name:'',open:false,msgs:[],thr:null,ok:true,max:null,busy:false,mode:null,sig:'',tick:0};
+  try{CK.name=localStorage.getItem('vb_chat_name')||''}catch(e){}
+  function E(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function gid(){var g=null;try{g=localStorage.getItem('vb_gid')}catch(e){}
+    if(!g){g=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16)});
+      try{localStorage.setItem('vb_gid',g)}catch(e){}}
+    return g}
+  function tf(ms){var d=new Date(ms),z={timeZone:'Asia/Manila'},t=d.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Manila'});
+    var a=d.toLocaleDateString('en-PH',z),b=new Date().toLocaleDateString('en-PH',z);
+    return a===b?t:d.toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})+', '+t}
+  var chb=document.createElement('button');chb.id='chb';chb.type='button';chb.setAttribute('aria-label','Chat');
+  chb.innerHTML='<span>💬</span><span class="chl">Chat</span><span id="chn" class="chn" style="display:none"></span>';
+  var chp=document.createElement('div');chp.id='chp';chp.setAttribute('role','dialog');chp.setAttribute('aria-label','Chat');
+  chp.innerHTML='<div class="chh"><button type="button" class="chx" id="chback" aria-label="Back">←</button><div class="cht0" id="chtt">Chat</div><button type="button" class="chx" id="chdel" title="Delete this conversation" aria-label="Delete conversation">🗑</button><button type="button" class="chx" id="chclose" aria-label="Close">✕</button></div><div class="chm" id="chm"></div><div class="chf" id="chf"><div class="cher" id="cher"></div><div class="chrow"><textarea id="chi" rows="1" maxlength="1000" placeholder="Type a message…"></textarea><button type="button" class="btn p" id="chs">Send</button></div></div>';
+  document.body.appendChild(chb);document.body.appendChild(chp);
+  function cerr(m){$('cher').textContent=m||''}
+  function onMsgs(rows){
+    rows.forEach(function(r){r._t=Date.parse(r.created_at)||0});
+    var me=mode==='admin'?'admin':'guest',mx=CK.max,newer=[];
+    if(mx!=null)newer=rows.filter(function(r){return r.id>mx&&r.sender!==me});
+    var top=rows.reduce(function(a,r){return r.id>a?r.id:a},mx==null?0:mx);
+    CK.msgs=rows;CK.ok=true;CK.max=top;
+    if(newer.length){var l=newer[newer.length-1],viewing=CK.open&&!document.hidden&&(mode==='guest'||CK.thr===l.guest_id);
+      if(!viewing){if(mode==='admin'){if(sndOn)chime();showToast('New chat message from '+(l.guest_name||'a guest'))}else{play('pop');showToast('The admin replied in chat')}}}
+    chDraw();if(CK.open)markRead()}
+  function cfetch(){if(!mode)return Promise.resolve();
+    var p=mode==='admin'?fetch(CT+'?select=*&order=created_at.desc&limit=400',{headers:hd()}).then(function(r){return r.ok?r.json():fail(r)}).then(function(a){return a.reverse()})
+      :fetch(SB_URL+'/rest/v1/rpc/chat_fetch',{method:'POST',headers:hd(),body:JSON.stringify({p_guest:gid()})}).then(function(r){return r.ok?r.json():fail(r)}).then(function(a){var g=gid();return a.map(function(x){x.guest_id=g;return x})});
+    return p.then(onMsgs).catch(function(){CK.ok=false;CK.sig='';chDraw()})}
+  function threads(){var m={},a=[];
+    CK.msgs.forEach(function(x){var t=m[x.guest_id];if(!t){t=m[x.guest_id]={id:x.guest_id,name:x.guest_name,last:x,unread:0};a.push(t)}
+      t.last=x;if(x.guest_name)t.name=x.guest_name;if(x.sender==='guest'&&!x.read_by_admin)t.unread++});
+    a.sort(function(p,q){return q.last._t-p.last._t});return a}
+  function unreadN(){return CK.msgs.filter(function(x){return mode==='admin'?(x.sender==='guest'&&!x.read_by_admin):(x.sender==='admin'&&!x.read_by_guest)}).length}
+  function thrName(id){var n='';CK.msgs.forEach(function(x){if(x.guest_id===id&&x.guest_name)n=x.guest_name});return n||'Guest'}
+  function markRead(){
+    if(mode==='admin'){if(!CK.thr)return;var u=CK.msgs.some(function(x){return x.guest_id===CK.thr&&x.sender==='guest'&&!x.read_by_admin});if(!u)return;
+      CK.msgs.forEach(function(x){if(x.guest_id===CK.thr&&x.sender==='guest')x.read_by_admin=true});chDraw();
+      fetch(CT+'?guest_id=eq.'+encodeURIComponent(CK.thr)+'&sender=eq.guest&read_by_admin=eq.false',{method:'PATCH',headers:hd({Prefer:'return=minimal'}),body:JSON.stringify({read_by_admin:true})}).catch(function(){})}
+    else{if(!unreadN())return;CK.msgs.forEach(function(x){if(x.sender==='admin')x.read_by_guest=true});chDraw();
+      fetch(SB_URL+'/rest/v1/rpc/chat_mark_read',{method:'POST',headers:hd(),body:JSON.stringify({p_guest:gid()})}).catch(function(){})}}
+  function chDraw(){
+    var n=unreadN(),bn=$('chn');bn.style.display=n?'':'none';bn.textContent=n>99?'99+':n;
+    if(!CK.open)return;
+    var inThr=mode==='admin'?!!CK.thr:!!CK.name,last=CK.msgs.length?CK.msgs[CK.msgs.length-1].id:0;
+    var sig=[mode,CK.ok,inThr,CK.thr,CK.name,CK.msgs.length,last,n,CK.msgs.map(function(x){return x.read_by_admin?1:0}).join('')].join('|');
+    $('chback').style.display=(mode==='admin'&&CK.thr)?'':'none';$('chdel').style.display=(mode==='admin'&&CK.thr)?'':'none';
+    $('chf').style.display=inThr&&CK.ok?'':'none';
+    $('chtt').textContent=mode==='admin'?(CK.thr?thrName(CK.thr):'Guest chats'):'Chat with Admin';
+    if(sig===CK.sig)return;CK.sig=sig;
+    var m=$('chm'),near=m.scrollHeight-m.scrollTop-m.clientHeight<70,h='';
+    if(!CK.ok){h='<div class="che">Chat is not available right now.'+(mode==='admin'?'<br><small>Admin: run <b>chat-setup.sql</b> in the Supabase SQL Editor to turn on chat.</small>':'')+'</div>'}
+    else if(mode==='admin'&&!CK.thr){var T=threads();
+      h=T.length?T.map(function(t){return '<button type="button" class="chth" data-g="'+E(t.id)+'"><span class="chav">'+E((t.name||'?').charAt(0).toUpperCase())+'</span><span class="chb2"><b>'+E(t.name||'Guest')+'</b><span class="chp2">'+(t.last.sender==='admin'?'You: ':'')+E(t.last.body)+'</span></span><span class="chmeta">'+E(tf(t.last._t))+(t.unread?'<i class="chn">'+t.unread+'</i>':'')+'</span></button>'}).join(''):'<div class="che">No chats yet. Messages from guests will show up here.</div>'}
+    else if(mode==='guest'&&!CK.name){h='<div class="chnm"><p>Before we start, what’s your name?</p><input id="chni" maxlength="40" placeholder="Your name" autocomplete="name"><button type="button" class="btn p" id="chng">Start chat</button></div>'}
+    else{var L=mode==='admin'?CK.msgs.filter(function(x){return x.guest_id===CK.thr}):CK.msgs,me=mode==='admin'?'admin':'guest',lastMine=-1;
+      L.forEach(function(x,i){if(x.sender===me)lastMine=i});
+      h=L.length?L.map(function(x,i){var mine=x.sender===me;return '<div class="chmsg '+(mine?'me':'th')+'"><div class="chbub">'+E(x.body)+'</div><div class="chtm">'+E(tf(x._t))+(mine&&i===lastMine&&mode==='guest'&&x.read_by_admin?' · Seen':'')+'</div></div>'}).join(''):'<div class="che">'+(mode==='guest'?'Send a message to the admin. Replies will appear here.':'No messages yet.')+'</div>'}
+    m.innerHTML=h;if(near||!m.dataset.o){m.scrollTop=m.scrollHeight;m.dataset.o='1'}}
+  function openChat(){CK.open=true;chp.classList.add('on');CK.sig='';chDraw();cfetch().then(function(){markRead()});
+    setTimeout(function(){var i=$('chni')||(($('chf').style.display!=='none')?$('chi'):null);if(i)i.focus()},50)}
+  function closeChat(){CK.open=false;chp.classList.remove('on')}
+  chb.onclick=function(){CK.open?closeChat():openChat()};
+  $('chclose').onclick=closeChat;
+  $('chback').onclick=function(){CK.thr=null;CK.sig='';cerr('');$('chm').dataset.o='';chDraw()};
+  $('chdel').onclick=function(){var t=CK.thr;if(!t||!confirm('Delete this whole conversation with '+thrName(t)+'?'))return;
+    fetch(CT+'?guest_id=eq.'+encodeURIComponent(t),{method:'DELETE',headers:hd({Prefer:'return=minimal'})}).then(function(r){return r.ok?0:fail(r)})
+    .then(function(){CK.thr=null;CK.sig='';return cfetch()}).catch(function(){cerr('Could not delete.')})};
+  $('chm').onclick=function(e){var t=e.target.closest?e.target.closest('.chth'):null;
+    if(t){CK.thr=t.getAttribute('data-g');CK.sig='';$('chm').dataset.o='';chDraw();markRead();setTimeout(function(){$('chi').focus()},30);return}
+    if(e.target.id==='chng')setName()};
+  $('chm').onkeydown=function(e){if(e.target.id==='chni'&&e.key==='Enter'){e.preventDefault();setName()}};
+  function setName(){var v=($('chni').value||'').trim();if(!v){$('chni').focus();return}
+    CK.name=v.slice(0,40);try{localStorage.setItem('vb_chat_name',CK.name)}catch(e){}CK.sig='';$('chm').dataset.o='';chDraw();setTimeout(function(){$('chi').focus()},30)}
+  function send(){var ta=$('chi'),v=ta.value.trim();if(!v||CK.busy)return;var req;cerr('');
+    if(mode==='admin'){var t=CK.thr;if(!t)return;
+      req=fetch(CT,{method:'POST',headers:hd({Prefer:'return=minimal'}),body:JSON.stringify({guest_id:t,guest_name:thrName(t),sender:'admin',body:v,read_by_admin:true})})}
+    else{if(!CK.name)return;
+      req=fetch(SB_URL+'/rest/v1/rpc/chat_send',{method:'POST',headers:hd(),body:JSON.stringify({p_guest:gid(),p_name:CK.name,p_body:v})})}
+    CK.busy=true;$('chs').disabled=true;
+    req.then(function(r){return r.ok?0:fail(r)}).then(function(){ta.value='';ta.style.height='';$('chm').dataset.o='';return cfetch()})
+    .catch(function(e){cerr(e&&e.message==='slow_down'?'You’re sending too fast. Please wait a moment.':'Could not send. Please try again.')})
+    .then(function(){CK.busy=false;$('chs').disabled=false;ta.focus()})}
+  $('chs').onclick=send;
+  $('chi').onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
+  $('chi').oninput=function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'};
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&CK.open)closeChat()});
+  function chatUI(){chb.style.display=mode?'':'none';if(!mode){closeChat();return}
+    if(CK.mode!==mode){CK.mode=mode;CK.msgs=[];CK.max=null;CK.thr=null;CK.sig='';cfetch()}}
+  var _show2=show;show=function(){_show2();chatUI()};chatUI();
+  setInterval(function(){if(!mode||document.hidden)return;CK.tick++;if(CK.open||CK.tick%3===0)cfetch()},3000);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden&&mode)cfetch()});
   db.collection('requests').onSnapshot(function(s){
     reqs=s.docs.map(function(d){var x=Object.assign({},d.data());x.id=d.id;return x});
     if(mode==='admin'){
@@ -960,6 +1053,31 @@ db=remoteDb();
 })();
 </script>
 <style>
+#chb{position:fixed;left:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:10000;display:flex;align-items:center;gap:8px;background:var(--br);color:var(--brt);border:0;border-radius:99px;padding:11px 16px;font:500 14px "DM Sans",system-ui,sans-serif;box-shadow:var(--sh);cursor:pointer}
+#chb:focus-visible{outline:none;box-shadow:var(--ring)}
+.chn{background:var(--no);color:#fff;font:600 11px/1 "DM Sans",system-ui,sans-serif;font-style:normal;border-radius:99px;padding:3px 7px;min-width:18px;text-align:center}
+#chp{position:fixed;left:14px;bottom:calc(70px + env(safe-area-inset-bottom,0px));z-index:10002;width:min(370px,calc(100vw - 28px));height:min(520px,calc(100dvh - 110px));display:none;flex-direction:column;background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:16px;box-shadow:var(--sh);overflow:hidden;font:400 14px/1.45 "DM Sans",system-ui,sans-serif}
+#chp.on{display:flex}
+.chh{display:flex;align-items:center;gap:4px;padding:10px 10px 10px 14px;border-bottom:1px solid var(--bd);background:var(--bg)}
+.cht0{flex:1;font:600 16px Fraunces,Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chx{background:none;border:0;color:var(--mut);font-size:16px;padding:6px 8px;border-radius:8px;cursor:pointer}.chx:hover{background:color-mix(in srgb,var(--gold) 14%,transparent);color:var(--tx)}
+.chm{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.chmsg{display:flex;flex-direction:column;max-width:82%}.chmsg.me{align-self:flex-end;align-items:flex-end}.chmsg.th{align-self:flex-start}
+.chbub{padding:8px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.chmsg.me .chbub{background:var(--br);color:var(--brt);border-bottom-right-radius:4px}
+.chmsg.th .chbub{background:var(--bg);border:1px solid var(--bd);border-bottom-left-radius:4px}
+.chtm{font-size:11px;color:var(--mut);margin-top:2px}
+.che{margin:auto;text-align:center;color:var(--mut);padding:20px;font-size:13.5px}
+.chnm{margin:auto 0;display:flex;flex-direction:column;gap:10px;padding:8px}.chnm p{margin:0;font-weight:500}
+.chth{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-bottom:1px solid var(--bd);color:inherit;font:inherit;text-align:left;padding:10px 6px;cursor:pointer;border-radius:8px}
+.chth:hover{background:color-mix(in srgb,var(--gold) 10%,transparent)}
+.chav{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--br);color:var(--brt);font-weight:600}
+.chb2{flex:1;min-width:0;display:flex;flex-direction:column}.chp2{color:var(--mut);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chmeta{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:11px;color:var(--mut)}
+.chf{border-top:1px solid var(--bd);padding:10px;background:var(--bg)}
+.chrow{display:flex;gap:8px;align-items:flex-end}.chrow textarea{resize:none;max-height:110px;flex:1}
+.cher{color:var(--no);font-size:12.5px;min-height:0}.cher:not(:empty){margin-bottom:6px}
+@media (max-width:480px){.chl{display:none}#chb{padding:12px 14px}}
 #sp{position:fixed;right:14px;z-index:10001;width:min(280px,calc(100vw - 28px));background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--sh);padding:8px;font:500 14px "DM Sans",system-ui,sans-serif}
 .sph{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 8px;border-bottom:1px solid var(--bd);margin-bottom:4px}
 .spt{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);cursor:pointer}
